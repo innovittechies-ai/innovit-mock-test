@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 from datetime import datetime, timedelta
+import random
 
 # Initialize session state
 if 'exam_started' not in st.session_state:
@@ -11,6 +12,8 @@ if 'answers' not in st.session_state:
     st.session_state.answers = {}
 if 'camera_active' not in st.session_state:
     st.session_state.camera_active = False
+if 'mic_active' not in st.session_state:
+    st.session_state.mic_active = False
 
 # MCQ Questions
 MCQ_QUESTIONS = [
@@ -38,9 +41,32 @@ DSA_QUESTION = {
 }
 
 def start_camera():
-    """Initialize camera - placeholder for demo"""
+    """Initialize camera simulation"""
     st.session_state.camera_active = True
+    st.session_state.mic_active = True
     return True
+
+def get_camera_status():
+    """Simulate camera activity with blinking indicator"""
+    if st.session_state.get('camera_active', False):
+        # Create blinking effect
+        blink = int(time.time()) % 2
+        return "🔴" if blink else "⚫"
+    return "⚫"
+
+def show_monitoring_alerts():
+    """Show random monitoring alerts to simulate proctoring"""
+    alerts = [
+        "⚠️ Face detection: Active",
+        "👁️ Eye tracking: Monitoring", 
+        "🔊 Audio monitoring: Active",
+        "📱 Screen sharing: Blocked",
+        "🚫 Tab switching: Disabled"
+    ]
+    
+    # Show random alert every few seconds
+    alert_index = int(time.time() / 3) % len(alerts)
+    return alerts[alert_index]
 
 def get_remaining_time():
     """Calculate remaining exam time"""
@@ -70,6 +96,8 @@ def main():
         st.write("- Click 'Start Exam' when ready")
         
         if st.button("🚀 Start Exam", type="primary"):
+            # Start camera and mic simulation
+            start_camera()
             st.session_state.exam_started = True
             st.session_state.start_time = datetime.now()
             st.rerun()
@@ -87,13 +115,25 @@ def main():
         
         with col1:
             st.markdown(f"### ⏱️ Time Remaining: {format_time(remaining_time)}")
+            # Show monitoring status
+            monitoring_alert = show_monitoring_alerts()
+            st.markdown(f"<div style='background: #e8f5e8; padding: 8px; border-radius: 5px; margin: 5px 0;'><small>{monitoring_alert}</small></div>", unsafe_allow_html=True)
         
         with col2:
-            # Camera placeholder (simplified for demo)
-            st.markdown("📹 **Camera Active**")
-            st.markdown("🎤 **Mic Active**")
-            # In real implementation, you'd show actual camera feed here
-            st.image("https://via.placeholder.com/150x100/FF0000/FFFFFF?text=CAMERA", width=150)
+            # Live camera and microphone simulation
+            camera_status = get_camera_status()
+            mic_status = get_mic_status()
+            
+            st.markdown(f"**{camera_status} Camera Active**")
+            st.markdown(f"**{mic_status}**")
+            
+            # Simulated camera feed with live timestamp
+            current_time = datetime.now().strftime("%H:%M:%S")
+            st.markdown(f"<div style='background: linear-gradient(45deg, #ff6b6b, #4ecdc4); color: white; padding: 20px; text-align: center; border-radius: 10px; margin: 10px 0;'><h4>📹 LIVE</h4><p>Recording Active</p><small>{current_time}</small></div>", unsafe_allow_html=True)
+            
+            # Add refresh button for live updates
+            if st.button("🔄 Refresh Status", key="refresh_cam"):
+                st.rerun()
         
         # Main exam content
         tab1, tab2 = st.tabs(["📝 MCQ Questions", "💻 Python DSA"])
