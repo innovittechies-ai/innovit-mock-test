@@ -2,8 +2,6 @@ import streamlit as st
 import time
 from datetime import datetime, timedelta
 import random
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
-import av
 
 # Initialize session state
 if 'exam_started' not in st.session_state:
@@ -48,16 +46,86 @@ def start_camera():
     st.session_state.mic_active = True
     return True
 
-def video_frame_callback(frame):
-    """Process video frames for monitoring"""
-    img = frame.to_ndarray(format="bgr24")
-    # Here you could add face detection, eye tracking, etc.
-    return av.VideoFrame.from_ndarray(img, format="bgr24")
-
-def audio_frame_callback(frame):
-    """Process audio frames for monitoring"""
-    # Here you could add audio analysis, speech detection, etc.
-    return frame
+def get_camera_html():
+    """Generate HTML5 camera access code"""
+    return """
+    <div style="text-align: center; padding: 20px; border: 2px solid #ff4444; border-radius: 10px; background: #fff5f5;">
+        <h4>📹 Live Camera Feed</h4>
+        <video id="cameraFeed" width="320" height="240" autoplay muted style="border-radius: 10px; border: 2px solid #ccc;"></video>
+        <br><br>
+        <button onclick="startCamera()" style="background: #ff4444; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">🔴 Start Camera</button>
+        <button onclick="stopCamera()" style="background: #666; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-left: 10px;">⏹️ Stop Camera</button>
+        <br><br>
+        <div id="cameraStatus" style="font-weight: bold; color: #ff4444;">📷 Camera: Inactive</div>
+        <div id="micStatus" style="font-weight: bold; color: #ff4444;">🎤 Microphone: Inactive</div>
+    </div>
+    
+    <script>
+        let stream = null;
+        let isRecording = false;
+        
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 320, height: 240 }, 
+                    audio: true 
+                });
+                
+                const video = document.getElementById('cameraFeed');
+                video.srcObject = stream;
+                
+                document.getElementById('cameraStatus').innerHTML = '📹 Camera: <span style="color: green;">ACTIVE & RECORDING</span>';
+                document.getElementById('micStatus').innerHTML = '🎤 Microphone: <span style="color: green;">ACTIVE & RECORDING</span>';
+                
+                isRecording = true;
+                
+                // Monitor for stream end
+                stream.getTracks().forEach(track => {
+                    track.onended = () => {
+                        document.getElementById('cameraStatus').innerHTML = '📷 Camera: <span style="color: red;">DISCONNECTED</span>';
+                        document.getElementById('micStatus').innerHTML = '🎤 Microphone: <span style="color: red;">DISCONNECTED</span>';
+                    };
+                });
+                
+            } catch (err) {
+                console.error('Error accessing camera/microphone:', err);
+                document.getElementById('cameraStatus').innerHTML = '📷 Camera: <span style="color: red;">ACCESS DENIED</span>';
+                document.getElementById('micStatus').innerHTML = '🎤 Microphone: <span style="color: red;">ACCESS DENIED</span>';
+                alert('Please allow camera and microphone access to continue with the exam.');
+            }
+        }
+        
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                document.getElementById('cameraFeed').srcObject = null;
+                document.getElementById('cameraStatus').innerHTML = '📷 Camera: Inactive';
+                document.getElementById('micStatus').innerHTML = '🎤 Microphone: Inactive';
+                isRecording = false;
+            }
+        }
+        
+        // Auto-start camera when page loads
+        window.addEventListener('load', function() {
+            setTimeout(startCamera, 1000);
+        });
+        
+        // Prevent tab switching during exam
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && isRecording) {
+                alert('⚠️ WARNING: Tab switching detected! This action has been logged.');
+            }
+        });
+        
+        // Prevent right-click
+        document.addEventListener('contextmenu', function(e) {
+            if (isRecording) {
+                e.preventDefault();
+                alert('⚠️ Right-click is disabled during the exam.');
+            }
+        });
+    </script>
+    """
 
 def get_camera_status():
     """Get real camera status"""
@@ -115,29 +183,11 @@ def main():
         st.markdown("### 📹 Camera & Microphone Test")
         st.info("⚠️ Please allow camera and microphone access when prompted by your browser.")
         
-        # Test camera and mic before exam
-        test_webrtc = webrtc_streamer(
-            key="test-camera",
-            mode=WebRtcMode.SENDRECV,
-            rtc_configuration=RTCConfiguration(
-                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-            ),
-            media_stream_constraints={
-                "video": {"width": 320, "height": 240},
-                "audio": True
-            },
-            async_processing=True,
-        )
+        # HTML5 Camera Test
+        st.components.v1.html(get_camera_html(), height=400)
         
-        if test_webrtc.state.playing:
-            st.success("✅ Camera and microphone are working!")
-            exam_ready = True
-        else:
-            st.warning("⚠️ Please enable camera and microphone to proceed.")
-            exam_ready = False
-        
-        if st.button("🚀 Start Exam", type="primary", disabled=not exam_ready):
-            # Start camera and mic
+        st.markdown("---")
+        if st.button("🚀 Start Exam", type="primary"):
             start_camera()
             st.session_state.exam_started = True
             st.session_state.start_time = datetime.now()
@@ -168,31 +218,8 @@ def main():
             st.markdown(f"**{camera_status}**")
             st.markdown(f"**{mic_status}**")
             
-            # Real-time webcam stream
-            webrtc_ctx = webrtc_streamer(
-                key="exam-camera",
-                mode=WebRtcMode.SENDRECV,
-                rtc_configuration=RTCConfiguration(
-                    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-                ),
-                video_frame_transformer=video_frame_callback,
-                audio_frame_transformer=audio_frame_callback,
-                media_stream_constraints={
-                    "video": {"width": 320, "height": 240},
-                    "audio": True
-                },
-                async_processing=True,
-            )
-            
-            # Show connection status
-            if webrtc_ctx.state.playing:
-                st.success("✅ Camera & Mic Active")
-                st.session_state.camera_active = True
-                st.session_state.mic_active = True
-            else:
-                st.error("❌ Camera & Mic Inactive")
-                st.session_state.camera_active = False
-                st.session_state.mic_active = False
+            # Real-time webcam stream during exam
+            st.components.v1.html(get_camera_html(), height=350)
         
         # Main exam content
         tab1, tab2 = st.tabs(["📝 MCQ Questions", "💻 Python DSA"])
