@@ -252,11 +252,6 @@ def main():
         
         with col1:
             st.markdown(f"### ⏱️ Time Elapsed: {format_time(elapsed_time)}")
-            
-            # Auto-refresh every 2 seconds to update timer
-            time.sleep(2)
-            st.rerun()
-            
             # Show monitoring status
             monitoring_alert = show_monitoring_alerts()
             st.markdown(f"<div style='background: #e8f5e8; padding: 8px; border-radius: 5px; margin: 5px 0;'><small>{monitoring_alert}</small></div>", unsafe_allow_html=True)
