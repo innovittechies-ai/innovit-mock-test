@@ -54,6 +54,14 @@ def get_camera_status():
         return "🔴" if blink else "⚫"
     return "⚫"
 
+def get_mic_status():
+    """Simulate microphone activity with random levels"""
+    if st.session_state.get('mic_active', False):
+        # Simulate audio levels
+        level = random.randint(1, 4)
+        return "🎤" + "█" * level + "░" * (4 - level)
+    return "🎤░░░░"
+
 def show_monitoring_alerts():
     """Show random monitoring alerts to simulate proctoring"""
     alerts = [
