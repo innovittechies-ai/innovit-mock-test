@@ -251,42 +251,11 @@ def main():
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            # Live JavaScript timer that updates automatically
-            start_time_js = int(st.session_state.start_time.timestamp() * 1000) if st.session_state.start_time else 0
+            st.markdown(f"### ⏱️ Time Elapsed: {format_time(elapsed_time)}")
             
-            timer_html = f"""
-            <div style="background: #f0f8ff; padding: 15px; border-radius: 10px; border: 2px solid #4CAF50;">
-                <h3 style="margin: 0; color: #2E7D32;">⏱️ Time Elapsed: <span id="timer">00:00</span></h3>
-                <div style="margin-top: 10px; font-size: 14px; color: #666;">Exam Duration: 15 minutes</div>
-            </div>
-            
-            <script>
-                const startTime = {start_time_js};
-                
-                function updateTimer() {{
-                    const now = new Date().getTime();
-                    const elapsed = Math.floor((now - startTime) / 1000);
-                    
-                    const minutes = Math.floor(elapsed / 60);
-                    const seconds = elapsed % 60;
-                    
-                    const formattedTime = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
-                    document.getElementById('timer').textContent = formattedTime;
-                    
-                    // Auto-submit after 15 minutes (900 seconds)
-                    if (elapsed >= 900) {{
-                        alert('⏰ Time\'s up! Exam will be submitted automatically.');
-                        // You could trigger form submission here
-                    }}
-                }}
-                
-                // Update timer every second
-                setInterval(updateTimer, 1000);
-                updateTimer(); // Initial call
-            </script>
-            """
-            
-            st.components.v1.html(timer_html, height=100)
+            # Auto-refresh every 2 seconds to update timer
+            time.sleep(2)
+            st.rerun()
             
             # Show monitoring status
             monitoring_alert = show_monitoring_alerts()
