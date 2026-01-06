@@ -2,6 +2,8 @@ import streamlit as st
 import time
 from datetime import datetime, timedelta
 import random
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
+import av
 
 # Initialize session state
 if 'exam_started' not in st.session_state:
@@ -41,26 +43,33 @@ DSA_QUESTION = {
 }
 
 def start_camera():
-    """Initialize camera simulation"""
+    """Initialize real camera and microphone"""
     st.session_state.camera_active = True
     st.session_state.mic_active = True
     return True
 
+def video_frame_callback(frame):
+    """Process video frames for monitoring"""
+    img = frame.to_ndarray(format="bgr24")
+    # Here you could add face detection, eye tracking, etc.
+    return av.VideoFrame.from_ndarray(img, format="bgr24")
+
+def audio_frame_callback(frame):
+    """Process audio frames for monitoring"""
+    # Here you could add audio analysis, speech detection, etc.
+    return frame
+
 def get_camera_status():
-    """Simulate camera activity with blinking indicator"""
+    """Get real camera status"""
     if st.session_state.get('camera_active', False):
-        # Create blinking effect
-        blink = int(time.time()) % 2
-        return "🔴" if blink else "⚫"
-    return "⚫"
+        return "🔴 LIVE"
+    return "⚫ OFFLINE"
 
 def get_mic_status():
-    """Simulate microphone activity with random levels"""
+    """Get real microphone status"""
     if st.session_state.get('mic_active', False):
-        # Simulate audio levels
-        level = random.randint(1, 4)
-        return "🎤" + "█" * level + "░" * (4 - level)
-    return "🎤░░░░"
+        return "🎤 RECORDING"
+    return "🎤 MUTED"
 
 def show_monitoring_alerts():
     """Show random monitoring alerts to simulate proctoring"""
@@ -103,8 +112,32 @@ def main():
         st.write("- Camera and microphone will be monitored")
         st.write("- Click 'Start Exam' when ready")
         
-        if st.button("🚀 Start Exam", type="primary"):
-            # Start camera and mic simulation
+        st.markdown("### 📹 Camera & Microphone Test")
+        st.info("⚠️ Please allow camera and microphone access when prompted by your browser.")
+        
+        # Test camera and mic before exam
+        test_webrtc = webrtc_streamer(
+            key="test-camera",
+            mode=WebRtcMode.SENDRECV,
+            rtc_configuration=RTCConfiguration(
+                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+            ),
+            media_stream_constraints={
+                "video": {"width": 320, "height": 240},
+                "audio": True
+            },
+            async_processing=True,
+        )
+        
+        if test_webrtc.state.playing:
+            st.success("✅ Camera and microphone are working!")
+            exam_ready = True
+        else:
+            st.warning("⚠️ Please enable camera and microphone to proceed.")
+            exam_ready = False
+        
+        if st.button("🚀 Start Exam", type="primary", disabled=not exam_ready):
+            # Start camera and mic
             start_camera()
             st.session_state.exam_started = True
             st.session_state.start_time = datetime.now()
@@ -128,20 +161,38 @@ def main():
             st.markdown(f"<div style='background: #e8f5e8; padding: 8px; border-radius: 5px; margin: 5px 0;'><small>{monitoring_alert}</small></div>", unsafe_allow_html=True)
         
         with col2:
-            # Live camera and microphone simulation
+            # Real camera and microphone streaming
             camera_status = get_camera_status()
             mic_status = get_mic_status()
             
-            st.markdown(f"**{camera_status} Camera Active**")
+            st.markdown(f"**{camera_status}**")
             st.markdown(f"**{mic_status}**")
             
-            # Simulated camera feed with live timestamp
-            current_time = datetime.now().strftime("%H:%M:%S")
-            st.markdown(f"<div style='background: linear-gradient(45deg, #ff6b6b, #4ecdc4); color: white; padding: 20px; text-align: center; border-radius: 10px; margin: 10px 0;'><h4>📹 LIVE</h4><p>Recording Active</p><small>{current_time}</small></div>", unsafe_allow_html=True)
+            # Real-time webcam stream
+            webrtc_ctx = webrtc_streamer(
+                key="exam-camera",
+                mode=WebRtcMode.SENDRECV,
+                rtc_configuration=RTCConfiguration(
+                    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+                ),
+                video_frame_transformer=video_frame_callback,
+                audio_frame_transformer=audio_frame_callback,
+                media_stream_constraints={
+                    "video": {"width": 320, "height": 240},
+                    "audio": True
+                },
+                async_processing=True,
+            )
             
-            # Add refresh button for live updates
-            if st.button("🔄 Refresh Status", key="refresh_cam"):
-                st.rerun()
+            # Show connection status
+            if webrtc_ctx.state.playing:
+                st.success("✅ Camera & Mic Active")
+                st.session_state.camera_active = True
+                st.session_state.mic_active = True
+            else:
+                st.error("❌ Camera & Mic Inactive")
+                st.session_state.camera_active = False
+                st.session_state.mic_active = False
         
         # Main exam content
         tab1, tab2 = st.tabs(["📝 MCQ Questions", "💻 Python DSA"])
