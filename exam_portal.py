@@ -14,6 +14,8 @@ if 'camera_active' not in st.session_state:
     st.session_state.camera_active = False
 if 'mic_active' not in st.session_state:
     st.session_state.mic_active = False
+if 'exam_submitted' not in st.session_state:
+    st.session_state.exam_submitted = False
 
 # MCQ Questions
 MCQ_QUESTIONS = [
@@ -46,8 +48,45 @@ def start_camera():
     st.session_state.mic_active = True
     return True
 
+def get_camera_close_html():
+    """Generate HTML to close camera and show thank you message"""
+    return """
+    <div style="text-align: center; padding: 40px; border: 2px solid #4CAF50; border-radius: 15px; background: linear-gradient(135deg, #e8f5e9, #f1f8e9);">
+        <h2 style="color: #2E7D32; margin-bottom: 20px;">🎉 Exam Submitted Successfully!</h2>
+        <div style="font-size: 64px; margin: 20px 0;">✅</div>
+        <h3 style="color: #388E3C; margin-bottom: 30px;">Thank you for completing the exam!</h3>
+        <p style="font-size: 18px; color: #555; margin-bottom: 20px;">Your responses have been recorded and submitted.</p>
+        <p style="font-size: 16px; color: #666; margin-bottom: 30px;">We will get back to you with the results soon.</p>
+        <div style="background: #fff; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <p style="color: #333; margin: 0;"><strong>What happens next?</strong></p>
+            <p style="color: #666; margin: 10px 0 0 0;">Our team will review your submission and contact you within 2-3 business days.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Stop all camera and microphone streams
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(function(stream) {
+                stream.getTracks().forEach(track => track.stop());
+            })
+            .catch(function(err) {
+                console.log('No active streams to stop');
+            });
+        
+        // Clear any existing video elements
+        const videos = document.querySelectorAll('video');
+        videos.forEach(video => {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+        });
+        
+        console.log('Camera and microphone have been stopped.');
+    </script>
+    """
+
 def get_camera_html():
-    """Generate HTML5 camera access code"""
     return """
     <div style="text-align: center; padding: 20px; border: 2px solid #ff4444; border-radius: 10px; background: #fff5f5;">
         <h4>📹 Live Camera Feed</h4>
@@ -153,13 +192,12 @@ def show_monitoring_alerts():
     alert_index = int(time.time() / 3) % len(alerts)
     return alerts[alert_index]
 
-def get_remaining_time():
-    """Calculate remaining exam time"""
+def get_elapsed_time():
+    """Calculate elapsed exam time"""
     if st.session_state.start_time:
         elapsed = datetime.now() - st.session_state.start_time
-        remaining = timedelta(minutes=15) - elapsed
-        return max(0, int(remaining.total_seconds()))
-    return 900  # 15 minutes in seconds
+        return int(elapsed.total_seconds())
+    return 0
 
 def format_time(seconds):
     """Format seconds to MM:SS"""
@@ -171,6 +209,12 @@ def main():
     
     # Header
     st.title("🎓 Online Exam Portal")
+    
+    # Check if exam is submitted
+    if st.session_state.get('exam_submitted', False):
+        # Show thank you page and close camera
+        st.components.v1.html(get_camera_close_html(), height=500)
+        st.stop()
     
     if not st.session_state.exam_started:
         # Pre-exam screen
@@ -195,17 +239,18 @@ def main():
     
     else:
         # Exam interface
-        remaining_time = get_remaining_time()
+        elapsed_time = get_elapsed_time()
         
-        if remaining_time <= 0:
-            st.error("⏰ Time's up! Exam ended.")
+        # Check if 15 minutes have passed
+        if elapsed_time >= 900:  # 15 minutes = 900 seconds
+            st.error("⏰ Time's up! Exam ended automatically.")
             st.stop()
         
         # Top bar with timer and camera
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            st.markdown(f"### ⏱️ Time Remaining: {format_time(remaining_time)}")
+            st.markdown(f"### ⏱️ Time Elapsed: {format_time(elapsed_time)}")
             # Show monitoring status
             monitoring_alert = show_monitoring_alerts()
             st.markdown(f"<div style='background: #e8f5e8; padding: 8px; border-radius: 5px; margin: 5px 0;'><small>{monitoring_alert}</small></div>", unsafe_allow_html=True)
@@ -272,16 +317,9 @@ def main():
         
         with col3:
             if st.button("🏁 Submit Exam", type="primary"):
-                st.success("Exam submitted successfully!")
-                st.balloons()
-                
-                # Show results summary
-                st.markdown("### Submission Summary")
-                st.write(f"MCQ Questions answered: {answered}/15")
-                st.write(f"DSA Question: {'Attempted' if 'dsa' in st.session_state.answers else 'Not attempted'}")
-                st.write(f"Time taken: {format_time(900 - remaining_time)}")
-                
-                st.stop()
+                # Close camera and show thank you message
+                st.session_state.exam_submitted = True
+                st.rerun()
 
 if __name__ == "__main__":
     main()
