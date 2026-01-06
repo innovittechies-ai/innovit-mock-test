@@ -1,9 +1,6 @@
 import streamlit as st
-import cv2
 import time
-
 from datetime import datetime, timedelta
-import numpy as np
 
 # Initialize session state
 if 'exam_started' not in st.session_state:
@@ -41,15 +38,9 @@ DSA_QUESTION = {
 }
 
 def start_camera():
-    """Initialize camera"""
-    try:
-        cap = cv2.VideoCapture(0)
-        if cap.isOpened():
-            st.session_state.camera_active = True
-            return cap
-    except:
-        st.error("Camera not accessible")
-    return None
+    """Initialize camera - placeholder for demo"""
+    st.session_state.camera_active = True
+    return True
 
 def get_remaining_time():
     """Calculate remaining exam time"""
